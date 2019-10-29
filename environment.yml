@@ -1,0 +1,24 @@
+name: libphase
+channels:
+  - defaults
+  - conda-forge
+  - anaconda
+  - quantstack
+  - nlesc
+dependencies:
+  - numpy
+  - scipy
+  - scikit-learn
+  - ipython
+  - jupyter
+  - flake8
+  - click
+  - tqdm
+  - pandas
+  - matplotlib
+  - cmake
+  - pip
+  - zlib
+  - pip:
+    - clickutil
+    - pixiedust
