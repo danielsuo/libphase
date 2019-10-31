@@ -59,7 +59,7 @@ main(int argc, char* argv[]) {
 
   FILE* trace_file = popen(ss.str().c_str(), "r");
 
-  input_instr instr;
+  instruction instr;
   CPUCounters curr_counters;
   CPUCounters prev_counters;
   uint64_t interval_start = 0;

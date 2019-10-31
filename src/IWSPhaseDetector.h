@@ -24,7 +24,7 @@ class IWSPhaseDetector : public PhaseDetector {
 
   void
   instructionUpdate(
-      const input_instr& instr,
+      const instruction& instr,
       const CPUCounters& curr_counters,
       const CPUCounters& prev_counters) override
   {
@@ -37,7 +37,7 @@ class IWSPhaseDetector : public PhaseDetector {
 
   void
   intervalUpdate(
-      const input_instr& instr,
+      const instruction& instr,
       const CPUCounters& curr_counters,
       const CPUCounters& prev_counters) override
   {

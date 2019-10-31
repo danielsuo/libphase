@@ -22,7 +22,7 @@ class PhaseManager {
   PhaseManager(uint64_t intervalLength, const YAML::Node& config);
 
   bool updatePhaseDetectors(
-      const input_instr& instr,
+      const instruction& instr,
       const CPUCounters& curr_counters,
       const CPUCounters& prev_counters);
 };

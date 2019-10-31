@@ -20,7 +20,7 @@ bool PhaseManager::isNewInterval(uint64_t instr_id)
 }
 
 bool PhaseManager::updatePhaseDetectors(
-    const input_instr& instr,
+    const instruction& instr,
     const CPUCounters& curr_counters,
     const CPUCounters& prev_counters)
 {

@@ -114,7 +114,7 @@ struct BRANCH {
   }
 };
 
-class input_instr {
+class instruction {
   public:
   // instruction pointer or PC (Program Counter)
   uint64_t ip;
@@ -140,7 +140,7 @@ class input_instr {
   uint64_t destination_memory[2]; // output memory
   uint64_t source_memory[4];      // input memory
 
-  input_instr()
+  instruction()
   {
     ip = 0;
     routine_id = 0;

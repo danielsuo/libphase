@@ -21,5 +21,10 @@ setup(
     author_email="dsuo@cs.princeton.edu",
     description="libphase",
     python_requires=">=3.6",
-    packages=find_packages()
+    packages=find_packages(),
+    entry_points="""
+    [console_scripts]
+    pin=libphase.scripts.pin:_pin
+    simpoint=libphase.scripts.simpoint:_simpoint
+    """
 )
