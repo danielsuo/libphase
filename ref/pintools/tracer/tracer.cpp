@@ -11,12 +11,14 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include "utils.h"
 #include "pin.H"
+#include "utils.h"
 #include "xed/xed-category-enum.h"
 
 #define NUM_INSTR_DESTINATIONS 2
 #define NUM_INSTR_SOURCES 4
+
+using namespace libphase;
 
 // RESOURCES
 // https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__INS__BASIC__API__GEN__IA32.html
@@ -50,7 +52,7 @@ std::ofstream meta_file;
 bool trace_file_closed = false;
 bool tracing_on = false;
 
-libphase::instruction curr_instr;
+instruction curr_instr;
 
 /* ===================================================================== */
 // Command line switches
@@ -118,11 +120,13 @@ Usage() {
 void
 finalize() {
   std::cout << "Traced " << instrCount << " instructions" << std::endl;
+  progress_file << "Instruction count: " << instrCount << std::endl;
   if (!trace_file_closed) {
     fclose(trace_file);
     trace_file_closed = true;
   }
   meta_file.close();
+  progress_file.close();
 }
 
 /* ===================================================================== */
@@ -131,6 +135,7 @@ finalize() {
 
 void
 BeginInstruction(VOID* ip, UINT32 opcode, UINT32 category) {
+  //cerr << "1 Begin: " << (unsigned long long int)ip << endl;
   if (instrCount % 1000000 == 0) {
     progress_file << program_name << ": " << instrCount << " instructions"
                   << std::endl;
@@ -175,8 +180,11 @@ EndInstruction() {
     if (instrCount <=
         (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
       // keep tracing
+      //cerr << "3 Actual: " << (uint32_t)curr_instr.branch_info << " "
+           //<< curr_instr.ip << endl;
       fwrite(&curr_instr, sizeof(curr_instr), 1, trace_file);
     } else {
+      //cerr << "Finalizing " << instrCount << endl;
       finalize();
       exit(0);
     }
@@ -184,9 +192,40 @@ EndInstruction() {
 }
 
 void
-BranchHandler(UINT32 is_taken) {
-  if (is_taken != 0) {
+BranchHandler(
+    BOOL is_taken,
+    BOOL is_branch,
+    BOOL is_call,
+    BOOL is_direct,
+    BOOL is_cond,
+    BOOL is_fwd,
+    BOOL is_ret) {
+  if (is_taken) {
     curr_instr.branch_info |= BRANCH::taken;
+  }
+
+  if (is_branch) {
+    curr_instr.branch_info |= BRANCH::branch;
+  }
+
+  if (is_call) {
+    curr_instr.branch_info |= BRANCH::call;
+  }
+
+  if (is_direct) {
+    curr_instr.branch_info |= BRANCH::direct;
+  }
+
+  if (is_cond) {
+    curr_instr.branch_info |= BRANCH::cond;
+  }
+
+  if (is_fwd) {
+    curr_instr.branch_info |= BRANCH::fwd;
+  }
+
+  if (is_ret) {
+    curr_instr.branch_info |= BRANCH::ret;
   }
 }
 
@@ -319,40 +358,25 @@ Instruction(INS ins, VOID* v) {
       IARG_END);
 
   // instrument branch instructions
-  if (INS_IsBranch(ins)) {
-    curr_instr.branch_info |= BRANCH::branch;
+  if (INS_IsBranchOrCall(ins)) {
     INS_InsertCall(
         ins,
         IPOINT_BEFORE,
         (AFUNPTR)BranchHandler,
         IARG_BRANCH_TAKEN,
+        IARG_BOOL,
+        INS_IsBranch(ins),
+        IARG_BOOL,
+        INS_IsCall(ins),
+        IARG_BOOL,
+        INS_IsDirectBranchOrCall(ins),
+        IARG_BOOL,
+        category == XED_CATEGORY_COND_BR,
+        IARG_BOOL,
+        INS_Address(INS_Next(ins)) > INS_Address(ins),
+        IARG_BOOL,
+        INS_IsRet(ins),
         IARG_END);
-  }
-
-  if (INS_IsCall(ins)) {
-    curr_instr.branch_info |= BRANCH::call;
-    // printf("Call: %d\n", curr_instr.branch_info);
-  }
-
-  if (INS_IsDirectBranchOrCall(ins)) {
-    curr_instr.branch_info |= BRANCH::direct;
-    // printf("Direct: %d\n", curr_instr.branch_info);
-  }
-
-  if (category == XED_CATEGORY_COND_BR) {
-    curr_instr.branch_info |= BRANCH::cond;
-    // printf("Conditional: %d\n", curr_instr.branch_info);
-  }
-
-  if (INS_IsBranchOrCall(ins)) {
-    INS next_ins = INS_Next(ins);
-    if (INS_Address(next_ins) > INS_Address(ins)) {
-      curr_instr.branch_info |= BRANCH::fwd;
-    }
-  }
-
-  if (INS_IsRet(ins)) {
-    curr_instr.branch_info |= BRANCH::ret;
   }
 
   // instrument register reads
@@ -427,7 +451,7 @@ Instruction(INS ins, VOID* v) {
 // Is called for every routine and instruments reads and writes
 VOID
 Routine(RTN rtn, VOID* v) {
-  std::cout << "Function: " << RTN_Name(rtn) << std::endl;
+  // std::cout << "Function: " << RTN_Name(rtn) << std::endl;
 }
 
 // Is called for every image and instruments reads and writes

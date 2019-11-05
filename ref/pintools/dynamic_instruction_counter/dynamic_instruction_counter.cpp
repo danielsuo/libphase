@@ -28,10 +28,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 END_LEGAL */
+#include "pin.H"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <locale>
-#include "pin.H"
 
 ofstream OutFile;
 
@@ -40,14 +41,14 @@ ofstream OutFile;
 static UINT64 icount = 0;
 
 // This function is called before every instruction is executed
-VOID
-docount() {
+VOID docount()
+{
   icount++;
 }
 
 // Pin calls this function every time a new instruction is encountered
-VOID
-Instruction(INS ins, VOID* v) {
+VOID Instruction(INS ins, VOID* v)
+{
   // Insert a call to docount before every instruction, no arguments are passed
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);
 }
@@ -59,9 +60,12 @@ KNOB<string> KnobOutputFile(
     "inscount.out",
     "specify output file name");
 
+KNOB<string> KnobOutputDirectory(
+    KNOB_MODE_WRITEONCE, "pintool", "d", "tmp", "specify output directory");
+
 // This function is called when the application exits
-VOID
-Fini(INT32 code, VOID* v) {
+VOID Fini(INT32 code, VOID* v)
+{
   // Write to a file since cout and cerr maybe closed by the application
   OutFile.setf(ios::showbase);
   OutFile << "Count " << icount << endl;
@@ -75,10 +79,12 @@ Fini(INT32 code, VOID* v) {
 /* ===================================================================== */
 
 INT32
-Usage() {
+Usage()
+{
   cerr << "This tool counts the number of dynamic instructions executed"
        << endl;
-  cerr << endl << KNOB_BASE::StringKnobSummary() << endl;
+  cerr << endl
+       << KNOB_BASE::StringKnobSummary() << endl;
   return -1;
 }
 
@@ -88,13 +94,17 @@ Usage() {
 /*   argc, argv are the entire command line: pin -t <toolname> -- ...    */
 /* ===================================================================== */
 
-int
-main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
   // Initialize pin
-  if (PIN_Init(argc, argv))
+  if (PIN_Init(argc, argv)) {
     return Usage();
+  }
+  std::stringstream ss;
 
-  // OutFile.open(KnobOutputFile.Value().c_str());
+  ss << KnobOutputDirectory.Value() << "/" << KnobOutputFile.Value();
+
+  OutFile.open(ss.str().c_str());
 
   // Register Instruction to be called to instrument instructions
   INS_AddInstrumentFunction(Instruction, 0);
