@@ -6,7 +6,7 @@ mkdir -p $DIR/tmp/count
 cmds=$DIR/tmp/count/cmds.sh
 rm -f $(dirname $cmds)/*
 
-for i in `find $DIR/spec/benchspec -maxdepth 3 -type d | grep run`; do
+for i in `find $DIR/cpu2017/benchspec -maxdepth 3 -type d | grep run`; do
   benchmark=$(basename $(dirname $i))
   speccmds=$(find $i | grep -E "speccmds\.cmd" | head -n 1)
   echo $benchmark
@@ -17,7 +17,7 @@ for i in `find $DIR/spec/benchspec -maxdepth 3 -type d | grep run`; do
 
   # Convert commands
   invoke=$(dirname $cmds)/$benchmark.sh
-  $DIR/spec/bin/specinvoke -n $speccmds >> $invoke
+  $DIR/cpu2017/bin/specinvoke -n $speccmds >> $invoke
 
   # Delete last line (speccmds exit: rc=1)
   sed -i '$d' $invoke

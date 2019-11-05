@@ -1,5 +1,8 @@
 # Directories
 build
+data
+tmp
+speccpu
 
 # Prerequisites
 *.d

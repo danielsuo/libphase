@@ -18,18 +18,29 @@ for i in `find $DIR/cpu2017/benchspec -maxdepth 3 -type d | grep run`; do
   cp $rundir/../../exe/* $rundir
 
   # Convert commands
+  raw=$(dirname $cmds)/$benchmark.raw.sh
   invoke=$(dirname $cmds)/$benchmark.sh
-  $DIR/cpu2017/bin/specinvoke -n $speccmds > $invoke
+  $DIR/cpu2017/bin/specinvoke -n $speccmds > $raw
 
   # Delete last line (speccmds exit: rc=1)
-  sed -i '$d' $invoke
+  sed -i '$d' $raw
 
   # Remove all comments
-  sed -i '/^#/d' $invoke
+  sed -i '/^#/d' $raw
   
-  # Export OMP variables every time
-  sed -i "s@^@export OMP_NUM_THREADS=1 \&\& cd $rundir \&\& @" $invoke
-done
 
-chmod +x $(dirname $cmds)/*
+  counter=0
+  while read; do
+    bbv=$(dirname $cmds)/$benchmark.$(( ++counter )).bbv
+    touch $bbv
+
+    echo "export OMP_NUM_THREADS=1 && cd $rundir && valgrind --tool=exp-bbv --bb-out-file=$bbv --interval-size=$DIM $REPLY" >> $invoke
+  done < $raw
+
+  # Make script executable
+  chmod +x $invoke
+
+  # Append script to parallel input
+  echo $invoke >> $cmds
+done
 
