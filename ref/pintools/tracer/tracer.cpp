@@ -47,10 +47,12 @@ UINT64 instrCount = 0;
 std::string program_name;
 std::string output_dir;
 std::ofstream progress_file;
-FILE* trace_file;
+FILE* ins_file;
+FILE* bbl_file;
+FILE* rtn_file;
 std::ofstream meta_file;
 
-bool trace_file_closed = false;
+bool ins_file_closed = false;
 bool tracing_on = false;
 
 instruction curr_instr;
@@ -58,12 +60,26 @@ instruction curr_instr;
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
-KNOB<string> KnobTracePath(
+KNOB<string> KnobINSPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
-    "f",
-    "phasesim.trace.gz",
-    "specify file name for PhaseSim tracer output");
+    "i",
+    "libphase.ins.gz",
+    "specify file name for libphase instruction stream");
+
+KNOB<string> KnobBBLPath(
+    KNOB_MODE_WRITEONCE,
+    "pintool",
+    "b",
+    "libphase.bbl.gz",
+    "specify file name for libphase basic block stream");
+
+KNOB<string> KnobRTNPath(
+    KNOB_MODE_WRITEONCE,
+    "pintool",
+    "r",
+    "libphase.rtn.gz",
+    "specify file name for libphase routine stream");
 
 KNOB<string> KnobOutputDirectory(
     KNOB_MODE_WRITEONCE, "pintool", "d", "tmp", "specify output directory");
@@ -72,14 +88,14 @@ KNOB<string> KnobProgressPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "p",
-    "phasesim.progress",
+    "libphase.progress",
     "specify file name to output progress");
 
 KNOB<string> KnobMetaPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "m",
-    "phasesim.meta",
+    "libphase.meta",
     "specify file name to output meta data");
 
 KNOB<UINT64> KnobSkipInstructions(
@@ -122,9 +138,11 @@ void
 finalize() {
   std::cout << "Traced " << instrCount << " instructions" << std::endl;
   progress_file << "Instruction count: " << instrCount << std::endl;
-  if (!trace_file_closed) {
-    fclose(trace_file);
-    trace_file_closed = true;
+  if (!ins_file_closed) {
+    fclose(ins_file);
+    fclose(bbl_file);
+    fclose(rtn_file);
+    ins_file_closed = true;
   }
   meta_file.close();
   progress_file.close();
@@ -135,8 +153,8 @@ finalize() {
 /* ===================================================================== */
 
 void
-BeginInstruction(VOID* ip, UINT32 opcode, UINT32 category) {
-  //cerr << "1 Begin: " << (unsigned long long int)ip << endl;
+BeginInstruction(VOID* ip, UINT32 routine_id, UINT32 opcode, UINT32 category) {
+  // cerr << "1 Begin: " << (unsigned long long int)ip << endl;
   if (instrCount % 1000000 == 0) {
     progress_file << program_name << ": " << instrCount << " instructions"
                   << std::endl;
@@ -156,7 +174,7 @@ BeginInstruction(VOID* ip, UINT32 opcode, UINT32 category) {
 
   // reset the current instruction
   curr_instr.ip = (unsigned long long int)ip;
-  curr_instr.routine_id = 0;
+  curr_instr.routine_id = routine_id;
 
   curr_instr.branch_info = 0;
   curr_instr.opcode = opcode;
@@ -180,12 +198,8 @@ EndInstruction() {
 
     if (instrCount <=
         (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
-      // keep tracing
-      //cerr << "3 Actual: " << (uint32_t)curr_instr.branch_info << " "
-           //<< curr_instr.ip << endl;
-      fwrite(&curr_instr, sizeof(curr_instr), 1, trace_file);
+      fwrite(&curr_instr, sizeof(curr_instr), 1, ins_file);
     } else {
-      //cerr << "Finalizing " << instrCount << endl;
       finalize();
       exit(0);
     }
@@ -344,14 +358,13 @@ Instruction(INS ins, VOID* v) {
   UINT32 category = INS_Category(ins);
   std::string category_string = CATEGORY_StringShort(category);
 
-  // Get globally-unique routine ID
-  curr_instr.routine_id = RTN_Id(INS_Rtn(ins));
-
   INS_InsertCall(
       ins,
       IPOINT_BEFORE,
       (AFUNPTR)BeginInstruction,
       IARG_INST_PTR,
+      IARG_UINT32,
+      RTN_Id(INS_Rtn(ins)),
       IARG_UINT32,
       opcode,
       IARG_UINT32,
@@ -449,10 +462,59 @@ Instruction(INS ins, VOID* v) {
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)EndInstruction, IARG_END);
 }
 
+VOID
+WriteBasicBlock(ADDRINT address, UINT32 num_ins) {
+  if (instrCount > KnobSkipInstructions.Value() &&
+      instrCount <=
+          (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
+    basicblock bbl;
+    bbl.address = address;
+    bbl.num_ins = num_ins;
+    fwrite(&bbl, sizeof(bbl), 1, bbl_file);
+  }
+}
+
+// Is called for every trace and instruments reads and writes
+VOID
+Trace(TRACE trace, VOID* v) {
+  // Visit every basic block  in the trace
+  for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
+    // Insert a call to docount before every bbl, passing the number of
+    // instructions
+    BBL_InsertCall(
+        bbl,
+        IPOINT_BEFORE,
+        (AFUNPTR)WriteBasicBlock,
+        IARG_ADDRINT,
+        BBL_Address(bbl),
+        IARG_UINT32,
+        BBL_NumIns(bbl),
+        IARG_END);
+  }
+}
+
+VOID WriteRoutine(UINT32 id, UINT32 num_ins) {
+  if (instrCount > KnobSkipInstructions.Value() &&
+      instrCount <=
+          (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
+    routine rtn;
+    rtn.id = id;
+    rtn.num_ins = num_ins;
+    fwrite(&rtn, sizeof(rtn), 1, rtn_file);
+  }
+}
+
 // Is called for every routine and instruments reads and writes
 VOID
 Routine(RTN rtn, VOID* v) {
   // std::cout << "Function: " << RTN_Name(rtn) << std::endl;
+  RTN_InsertCall(rtn,
+      IPOINT_BEFORE,
+      (AFUNPTR)WriteRoutine,
+      IARG_UINT32,
+      RTN_Id(rtn),
+      IARG_UINT32,
+      RTN_NumIns(rtn));
 }
 
 // Is called for every image and instruments reads and writes
@@ -503,18 +565,37 @@ main(int argc, char* argv[]) {
   ss << KnobOutputDirectory.Value().c_str() << "/"
      << KnobProgressPath.Value().c_str();
   progress_file.open(ss.str().c_str());
+
   ss.str(std::string());
   ss << "gzip -9c > " << KnobOutputDirectory.Value().c_str() << "/"
-     << KnobTracePath.Value().c_str();
+     << KnobINSPath.Value().c_str();
+  ins_file = popen(ss.str().c_str(), "w");
 
-  trace_file = popen(ss.str().c_str(), "w");
+  ss.str(std::string());
+  ss << "gzip -9c > " << KnobOutputDirectory.Value().c_str() << "/"
+     << KnobBBLPath.Value().c_str();
+  bbl_file = popen(ss.str().c_str(), "w");
+
+  ss.str(std::string());
+  ss << "gzip -9c > " << KnobOutputDirectory.Value().c_str() << "/"
+     << KnobRTNPath.Value().c_str();
+  rtn_file = popen(ss.str().c_str(), "w");
+
   ss.str(std::string());
   ss << KnobOutputDirectory.Value().c_str() << "/"
      << KnobMetaPath.Value().c_str();
   meta_file.open(ss.str().c_str());
 
-  if (!trace_file) {
-    std::cout << "Couldn't open output trace file. Exiting." << std::endl;
+  if (!ins_file) {
+    std::cout << "Couldn't open ins file. Exiting." << std::endl;
+    exit(1);
+  }
+  if (!bbl_file) {
+    std::cout << "Couldn't open bbl file. Exiting." << std::endl;
+    exit(1);
+  }
+  if (!rtn_file) {
+    std::cout << "Couldn't open rtn file. Exiting." << std::endl;
     exit(1);
   }
 
@@ -526,6 +607,9 @@ main(int argc, char* argv[]) {
   // Register function to be called to instrument instructions
   INS_AddInstrumentFunction(Instruction, 0);
 
+  // Register function to be called to instrument bassic blocks
+  TRACE_AddInstrumentFunction(Trace, 0);
+
   // Register function to be called to instrument routines
   RTN_AddInstrumentFunction(Routine, 0);
 
@@ -534,9 +618,9 @@ main(int argc, char* argv[]) {
 
   std::cerr << "===============================================" << std::endl;
   std::cerr
-      << "This application is instrumented by the PhaseSim Trace Generator"
+      << "This application is instrumented by the libphase Trace Generator"
       << std::endl;
-  std::cerr << "Trace saved in " << KnobTracePath.Value() << std::endl;
+  std::cerr << "Trace saved in " << KnobINSPath.Value() << std::endl;
   std::cerr << "===============================================" << std::endl;
 
   // Start the program, never returns

@@ -159,4 +159,17 @@ class instruction {
     }
   };
 };
+
+class basicblock {
+  public:
+    // TODO: poorly packed data
+    uint64_t address;
+    uint32_t num_ins;
+};
+
+class routine {
+  public:
+    uint32_t id;
+    uint32_t num_ins;
+};
 } // namespace libphase
