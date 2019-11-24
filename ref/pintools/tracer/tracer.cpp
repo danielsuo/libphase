@@ -23,6 +23,7 @@ using namespace libphase;
 // RESOURCES
 // https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__INS__BASIC__API__GEN__IA32.html
 // https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__RTN__BASIC__API.html
+// https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__BBL__BASIC__API.html
 // https://software.intel.com/sites/landingpage/pintool/docs/97503/Pin/html/group__INST__ARGS.html
 
 // To collect

@@ -2,7 +2,9 @@
 build
 data
 tmp
-speccpu
+cpu2017
+
+compile_commands.json
 
 # Prerequisites
 *.d
