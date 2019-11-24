@@ -16,23 +16,28 @@ for i in `find $DIR/cpu2017/benchspec -maxdepth 3 -type d | grep run`; do
   cp $rundir/../../exe/* $rundir
 
   # Convert commands
+  raw=$(dirname $cmds)/$benchmark.raw.sh
   invoke=$(dirname $cmds)/$benchmark.sh
-  $DIR/cpu2017/bin/specinvoke -n $speccmds >> $invoke
+  $DIR/cpu2017/bin/specinvoke -n $speccmds > $raw
 
   # Delete last line (speccmds exit: rc=1)
-  sed -i '$d' $invoke
+  sed -i '$d' $raw
 
   # Remove all comments
-  sed -i '/^#/d' $invoke
+  sed -i '/^#/d' $raw
   
-  # Form commands
-  count=$(dirname $cmds)/$benchmark.count
-  touch $count
+  counter=0
+  while read; do
+    bbv=$(dirname $cmds)/$benchmark.$(( ++counter )).count
+    touch $bbv
 
-  # Export OMP variables every time
-  sed -i "s@^@export OMP_NUM_THREADS=1 \&\& cd $rundir \&\& perf stat -x, -e instructions:u -o $(dirname $cmds)/$benchmark.count @" $invoke
+    echo "export OMP_NUM_THREADS=1 && cd $rundir && perf stat -x, -e instructions:u -o $(dirname $cmds)/$benchmark.count $REPLY" >> $invoke
+  done < $raw
 
-  # Only take the first output
-  echo $(head $invoke -n 1) >> $cmds
+  # Make script executable
+  chmod +x $invoke
+
+  # Append script to parallel input
+  echo $invoke >> $cmds
 done
 

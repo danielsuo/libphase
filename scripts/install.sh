@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+sudo apt-get install linux-tools-common linux-tools-generic linux-tools-`uname -r`
+
+# OPTIONAL: Allow perf without sudo
+sudo sh -c 'echo 1 >/proc/sys/kernel/perf_event_paranoid'
+sudo sysctl -w kernel.perf_event_paranoid=1
+sudo sh -c 'echo kernel.perf_event_paranoid=1 > /etc/sysctl.d/local.conf'
+
 brew install gcc@9
 
 # Assuming you're in a python virtual environment
