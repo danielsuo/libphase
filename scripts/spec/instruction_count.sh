@@ -28,10 +28,10 @@ for i in `find $DIR/cpu2017/benchspec -maxdepth 3 -type d | grep run`; do
   
   counter=0
   while read; do
-    bbv=$(dirname $cmds)/$benchmark.$(( ++counter )).count
-    touch $bbv
+    countfile=$(dirname $cmds)/$benchmark.$(( ++counter )).count
+    touch $countfile
 
-    echo "export OMP_NUM_THREADS=1 && cd $rundir && perf stat -x, -e instructions:u -o $(dirname $cmds)/$benchmark.count $REPLY" >> $invoke
+    echo "export OMP_NUM_THREADS=1 && cd $rundir && perf stat -x, -e instructions:u -o $countfile $REPLY" >> $invoke
   done < $raw
 
   # Make script executable
