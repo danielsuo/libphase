@@ -59,6 +59,8 @@ class BBVPhaseDetector : public PhaseDetector {
       delta_ += fabs(((float)lib1_[i]) / sum1 - ((float)lib2_[i]) / sum2);
     }
 
+    log_ << sum1 << " " << sum2;
+
     if (lib1_is_prev_) {
       lib1_.resize(bbv_dim_, 0);
     } else {

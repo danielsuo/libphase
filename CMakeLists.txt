@@ -10,10 +10,13 @@ set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 option (BuildPintools "BuildPintools" ON)
+option (BuildTools "BuildTools" ON)
+option (BuildTests "BuildTests" OFF)
 
 # Define sources
 file (GLOB LIB_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc)
 file (GLOB DEMO_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/demo/*.cc)
+file (GLOB TOOLS_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/ref/tools/*.cc)
 
 # Add dependencies
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/deps/yaml-cpp)
@@ -53,13 +56,20 @@ target_link_libraries(
   ${PROJECT_NAME}
   )
 
+# Macro for creating a subdirectory list
+MACRO(SUBDIRLIST result curdir)
+  FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
+  SET(dirlist "")
+  FOREACH(child ${children})
+    IF(IS_DIRECTORY ${curdir}/${child})
+      LIST(APPEND dirlist ${child})
+    ENDIF()
+  ENDFOREACH()
+  SET(${result} ${dirlist})
+ENDMACRO()
+
 # Build tracing libraries
-set (
-  PINTOOLS
-  tracer
-  static_instruction_counter
-  dynamic_instruction_counter
-  )
+SUBDIRLIST(PINTOOLS ${CMAKE_CURRENT_SOURCE_DIR}/ref/pintools)
 
 if (BuildPintools)
   foreach (tool ${PINTOOLS})
@@ -79,6 +89,25 @@ if (BuildPintools)
       )
   endforeach (tool)
 endif (BuildPintools)
+
+if (BuildTools)
+  foreach (tool_path ${TOOLS_SOURCE})
+    get_filename_component (tool_name ${tool_path} NAME_WE)
+
+    add_executable (
+      ${tool_name}
+      ${tool_path}
+      )
+
+    target_link_libraries (
+      ${tool_name}
+      readline
+      z
+      yaml-cpp
+      ${CMAKE_THREAD_LIBS_INIT}
+      )
+  endforeach (tool_path)
+endif(BuildTools)
 
 add_custom_command (
   OUTPUT always_rebuild

@@ -12,7 +12,7 @@ SIMPOINT_HOME = os.path.join(
     "deps/simpoint/simpoint-git-prefix/src/simpoint-git/")
 
 
-def simpoint(bbv_file, k, max_k, output_dir, verbose, args):
+def simpoint(bbv_file, k, max_k, variable_length, output_dir, verbose, args):
 
     print(locals())
 
@@ -30,6 +30,9 @@ def simpoint(bbv_file, k, max_k, output_dir, verbose, args):
         cmd.extend(["-k", k])
     else:
         cmd.extend(["-maxK", str(max_k)])
+
+    if variable_length:
+        cmd.extend(["-fixedLength", "off"])
 
     cmd.extend(args)
 
@@ -65,6 +68,12 @@ def simpoint(bbv_file, k, max_k, output_dir, verbose, args):
     default=30,
     type=int,
     help="Compute up to max k using binary search")
+@click.option(
+    "--variable-length",
+    type=bool,
+    is_flag=True,
+    help="Use variable length"
+)
 @click.option(
     "-o",
     "--output-dir",

@@ -36,7 +36,7 @@ main(int argc, char* argv[]) {
            value("trace", trace_path),
        option("-c", "--conf-path").doc("Configuration path") &
            value("conf", conf_path),
-       option("-l", "--interval-length").doc("Interval length") &
+       option("-i", "--interval-length").doc("Interval length") &
            value("length", interval_length),
        option("-l", "--heartbeat-period").doc("Heartbeat period") &
            value("period", heartbeat_period));
@@ -55,7 +55,7 @@ main(int argc, char* argv[]) {
   cout << "Reading from " << trace_path << endl;
 
   stringstream ss;
-  ss << "xz -dc " << trace_path;
+  ss << "gunzip -c " << trace_path;
 
   FILE* trace_file = popen(ss.str().c_str(), "r");
 

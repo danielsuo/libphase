@@ -8,6 +8,11 @@
 
 namespace libphase {
 
+struct CONSTANTS {
+  static const uint8_t num_instr_srcs = 4;
+  static const uint8_t num_instr_dsts = 2;
+};
+
 struct GlobalCounters {
 };
 
@@ -133,12 +138,11 @@ class instruction {
   // branch info
   uint8_t branch_info;
 
-  // TODO: these shouldn't be hard-coded
-  uint8_t destination_registers[2]; // output registers
-  uint8_t source_registers[4];      // input registers
+  uint8_t destination_registers[CONSTANTS::num_instr_dsts]; // output registers
+  uint8_t source_registers[CONSTANTS::num_instr_srcs];      // input registers
 
-  uint64_t destination_memory[2]; // output memory
-  uint64_t source_memory[4];      // input memory
+  uint64_t destination_memory[CONSTANTS::num_instr_dsts]; // output memory
+  uint64_t source_memory[CONSTANTS::num_instr_srcs];      // input memory
 
   instruction()
   {
@@ -148,12 +152,12 @@ class instruction {
     category = 0;
     branch_info = 0;
 
-    for (uint32_t i = 0; i < 4; i++) {
+    for (uint32_t i = 0; i < CONSTANTS::num_instr_srcs; i++) {
       source_registers[i] = 0;
       source_memory[i] = 0;
     }
 
-    for (uint32_t i = 0; i < 2; i++) {
+    for (uint32_t i = 0; i < CONSTANTS::num_instr_dsts; i++) {
       destination_registers[i] = 0;
       destination_memory[i] = 0;
     }
