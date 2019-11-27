@@ -5,10 +5,15 @@ tmp
 cpu2017
 traces
 
+compile_commands.json
+
+# Output
 *.err
 *.out*
 *.stderr
 *.stdout
+cam4*
+exchange2*
 
 # Prerequisites
 *.d

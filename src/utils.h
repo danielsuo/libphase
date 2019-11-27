@@ -1,10 +1,10 @@
 #pragma once
 
-#include "stdint.h"
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <string>
+#include "stdint.h"
 
 namespace libphase {
 
@@ -13,27 +13,25 @@ struct CONSTANTS {
   static const uint8_t num_instr_dsts = 2;
 };
 
-struct GlobalCounters {
-};
+struct GlobalCounters {};
 
 struct CPUCounters {
   // Accumulators: Counters for which we are interested in deltas from one
   // period to the next (e.g., cycles)
-  uint64_t instructions = 0;
-  uint64_t cycles = 0;
+  uint64_t instructions;
+  uint64_t cycles;
 
   // Resetable accumulators: Like accumulators, but reset to 0 each interval
-  int64_t branches = 0;
+  int64_t branches;
 
   // Levels: Counters for which we are interested in the current level (e.g., LQ
   // occupancy)
-  uint64_t lq_occupancy = 0;
+  uint64_t lq_occupancy;
 
-  CPUCounters() {}
+  CPUCounters() : instructions(0), cycles(0), branches(0), lq_occupancy(0) {}
 
   friend CPUCounters
-  operator-(const CPUCounters& c1, const CPUCounters& c2)
-  {
+  operator-(const CPUCounters& c1, const CPUCounters& c2) {
     CPUCounters counters;
 
     // Accumulators
@@ -50,8 +48,7 @@ struct CPUCounters {
   }
 
   void
-  reset()
-  {
+  reset() {
     branches = 0;
   }
 };
@@ -66,8 +63,7 @@ struct BRANCH {
   static const uint8_t ret = 0b01000000;
 
   static void
-  print(uint8_t info)
-  {
+  print(uint8_t info) {
     std::cout << "Branch: ";
     if (info & branch) {
       std::cout << "true" << std::endl;
@@ -120,7 +116,7 @@ struct BRANCH {
 };
 
 class instruction {
-  public:
+ public:
   // instruction pointer or PC (Program Counter)
   uint64_t ip;
 
@@ -138,14 +134,22 @@ class instruction {
   // branch info
   uint8_t branch_info;
 
+<<<<<<< HEAD
   uint8_t destination_registers[CONSTANTS::num_instr_dsts]; // output registers
-  uint8_t source_registers[CONSTANTS::num_instr_srcs];      // input registers
+  uint8_t source_registers[CONSTANTS::num_instr_srcs]; // input registers
 
   uint64_t destination_memory[CONSTANTS::num_instr_dsts]; // output memory
-  uint64_t source_memory[CONSTANTS::num_instr_srcs];      // input memory
+  uint64_t source_memory[CONSTANTS::num_instr_srcs]; // input memory
+=======
+  // TODO: these shouldn't be hard-coded
+  uint8_t destination_registers[2]; // output registers
+  uint8_t source_registers[4]; // input registers
 
-  instruction()
-  {
+  uint64_t destination_memory[2]; // output memory
+  uint64_t source_memory[4]; // input memory
+>>>>>>> dc4bccef49612f1551019f918452c9f5bd481f7d
+
+  instruction() {
     ip = 0;
     routine_id = 0;
     opcode = 0;
@@ -162,5 +166,18 @@ class instruction {
       destination_memory[i] = 0;
     }
   };
+};
+
+class basicblock {
+ public:
+  // TODO: poorly packed data
+  uint64_t address;
+  uint32_t num_ins;
+};
+
+class routine {
+ public:
+  uint32_t id;
+  uint32_t num_ins;
 };
 } // namespace libphase

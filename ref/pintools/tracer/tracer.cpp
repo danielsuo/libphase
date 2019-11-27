@@ -11,8 +11,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include "TraceIO.h"
 #include "pin.H"
-#include "utils.h"
 #include "xed/xed-category-enum.h"
 
 #define NUM_INSTR_DESTINATIONS 2
@@ -23,6 +23,7 @@ using namespace libphase;
 // RESOURCES
 // https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__INS__BASIC__API__GEN__IA32.html
 // https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__RTN__BASIC__API.html
+// https://software.intel.com/sites/landingpage/pintool/docs/81205/Pin/html/group__BBL__BASIC__API.html
 // https://software.intel.com/sites/landingpage/pintool/docs/97503/Pin/html/group__INST__ARGS.html
 
 // To collect
@@ -46,23 +47,37 @@ UINT64 instrCount = 0;
 std::string program_name;
 std::string output_dir;
 std::ofstream progress_file;
-FILE* trace_file;
 std::ofstream meta_file;
 
-bool trace_file_closed = false;
+TraceIO* io;
+
 bool tracing_on = false;
 
-instruction curr_instr;
+instruction curr_ins;
 
 /* ===================================================================== */
 // Command line switches
 /* ===================================================================== */
-KNOB<string> KnobTracePath(
+KNOB<string> KnobINSPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "f",
-    "phasesim.trace.gz",
-    "specify file name for PhaseSim tracer output");
+    "libphase.ins.xz",
+    "specify file name for libphase instruction stream");
+
+KNOB<string> KnobBBLPath(
+    KNOB_MODE_WRITEONCE,
+    "pintool",
+    "b",
+    "libphase.bbl.xz",
+    "specify file name for libphase basic block stream");
+
+KNOB<string> KnobRTNPath(
+    KNOB_MODE_WRITEONCE,
+    "pintool",
+    "r",
+    "libphase.rtn.xz",
+    "specify file name for libphase routine stream");
 
 KNOB<string> KnobOutputDirectory(
     KNOB_MODE_WRITEONCE, "pintool", "d", "tmp", "specify output directory");
@@ -71,14 +86,14 @@ KNOB<string> KnobProgressPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "p",
-    "phasesim.progress",
+    "libphase.progress",
     "specify file name to output progress");
 
 KNOB<string> KnobMetaPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "m",
-    "phasesim.meta",
+    "libphase.meta",
     "specify file name to output meta data");
 
 KNOB<UINT64> KnobSkipInstructions(
@@ -121,12 +136,9 @@ void
 finalize() {
   std::cout << "Traced " << instrCount << " instructions" << std::endl;
   progress_file << "Instruction count: " << instrCount << std::endl;
-  if (!trace_file_closed) {
-    fclose(trace_file);
-    trace_file_closed = true;
-  }
   meta_file.close();
   progress_file.close();
+  delete io;
 }
 
 /* ===================================================================== */
@@ -134,8 +146,8 @@ finalize() {
 /* ===================================================================== */
 
 void
-BeginInstruction(VOID* ip, UINT32 opcode, UINT32 category) {
-  //cerr << "1 Begin: " << (unsigned long long int)ip << endl;
+BeginInstruction(VOID* ip, UINT32 routine_id, UINT32 opcode, UINT32 category) {
+  // cerr << "1 Begin: " << (unsigned long long int)ip << endl;
   if (instrCount % 1000000 == 0) {
     progress_file << program_name << ": " << instrCount << " instructions"
                   << std::endl;
@@ -154,21 +166,21 @@ BeginInstruction(VOID* ip, UINT32 opcode, UINT32 category) {
     return;
 
   // reset the current instruction
-  curr_instr.ip = (unsigned long long int)ip;
-  curr_instr.routine_id = 0;
+  curr_ins.ip = (unsigned long long int)ip;
+  curr_ins.routine_id = routine_id;
 
-  curr_instr.branch_info = 0;
-  curr_instr.opcode = opcode;
-  curr_instr.category = category;
+  curr_ins.branch_info = 0;
+  curr_ins.opcode = opcode;
+  curr_ins.category = category;
 
   for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-    curr_instr.destination_registers[i] = 0;
-    curr_instr.destination_memory[i] = 0;
+    curr_ins.destination_registers[i] = 0;
+    curr_ins.destination_memory[i] = 0;
   }
 
   for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-    curr_instr.source_registers[i] = 0;
-    curr_instr.source_memory[i] = 0;
+    curr_ins.source_registers[i] = 0;
+    curr_ins.source_memory[i] = 0;
   }
 }
 
@@ -179,12 +191,8 @@ EndInstruction() {
 
     if (instrCount <=
         (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
-      // keep tracing
-      //cerr << "3 Actual: " << (uint32_t)curr_instr.branch_info << " "
-           //<< curr_instr.ip << endl;
-      fwrite(&curr_instr, sizeof(curr_instr), 1, trace_file);
+      io->write_ins(curr_ins);
     } else {
-      //cerr << "Finalizing " << instrCount << endl;
       finalize();
       exit(0);
     }
@@ -201,31 +209,31 @@ BranchHandler(
     BOOL is_fwd,
     BOOL is_ret) {
   if (is_taken) {
-    curr_instr.branch_info |= BRANCH::taken;
+    curr_ins.branch_info |= BRANCH::taken;
   }
 
   if (is_branch) {
-    curr_instr.branch_info |= BRANCH::branch;
+    curr_ins.branch_info |= BRANCH::branch;
   }
 
   if (is_call) {
-    curr_instr.branch_info |= BRANCH::call;
+    curr_ins.branch_info |= BRANCH::call;
   }
 
   if (is_direct) {
-    curr_instr.branch_info |= BRANCH::direct;
+    curr_ins.branch_info |= BRANCH::direct;
   }
 
   if (is_cond) {
-    curr_instr.branch_info |= BRANCH::cond;
+    curr_ins.branch_info |= BRANCH::cond;
   }
 
   if (is_fwd) {
-    curr_instr.branch_info |= BRANCH::fwd;
+    curr_ins.branch_info |= BRANCH::fwd;
   }
 
   if (is_ret) {
-    curr_instr.branch_info |= BRANCH::ret;
+    curr_ins.branch_info |= BRANCH::ret;
   }
 }
 
@@ -239,15 +247,15 @@ RegRead(UINT32 i, UINT32 index) {
   // check to see if this register is already in the list
   int already_found = 0;
   for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-    if (curr_instr.source_registers[i] == ((unsigned char)r)) {
+    if (curr_ins.source_registers[i] == ((unsigned char)r)) {
       already_found = 1;
       break;
     }
   }
   if (already_found == 0) {
     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-      if (curr_instr.source_registers[i] == 0) {
-        curr_instr.source_registers[i] = (unsigned char)r;
+      if (curr_ins.source_registers[i] == 0) {
+        curr_ins.source_registers[i] = (unsigned char)r;
         break;
       }
     }
@@ -263,15 +271,15 @@ RegWrite(REG i, UINT32 index) {
 
   int already_found = 0;
   for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-    if (curr_instr.destination_registers[i] == ((unsigned char)r)) {
+    if (curr_ins.destination_registers[i] == ((unsigned char)r)) {
       already_found = 1;
       break;
     }
   }
   if (already_found == 0) {
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-      if (curr_instr.destination_registers[i] == 0) {
-        curr_instr.destination_registers[i] = (unsigned char)r;
+      if (curr_ins.destination_registers[i] == 0) {
+        curr_ins.destination_registers[i] = (unsigned char)r;
         break;
       }
     }
@@ -279,7 +287,7 @@ RegWrite(REG i, UINT32 index) {
   /*
      if(index==0)
      {
-     curr_instr.destination_register = (unsigned long long int)r;
+     curr_ins.destination_register = (unsigned long long int)r;
      }
      */
 }
@@ -292,15 +300,15 @@ MemoryRead(VOID* addr, UINT32 index, UINT32 read_size) {
   // check to see if this memory read location is already in the list
   int already_found = 0;
   for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-    if (curr_instr.source_memory[i] == ((unsigned long long int)addr)) {
+    if (curr_ins.source_memory[i] == ((unsigned long long int)addr)) {
       already_found = 1;
       break;
     }
   }
   if (already_found == 0) {
     for (int i = 0; i < NUM_INSTR_SOURCES; i++) {
-      if (curr_instr.source_memory[i] == 0) {
-        curr_instr.source_memory[i] = (unsigned long long int)addr;
+      if (curr_ins.source_memory[i] == 0) {
+        curr_ins.source_memory[i] = (unsigned long long int)addr;
         break;
       }
     }
@@ -315,15 +323,15 @@ MemoryWrite(VOID* addr, UINT32 index) {
   // check to see if this memory write location is already in the list
   int already_found = 0;
   for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-    if (curr_instr.destination_memory[i] == ((unsigned long long int)addr)) {
+    if (curr_ins.destination_memory[i] == ((unsigned long long int)addr)) {
       already_found = 1;
       break;
     }
   }
   if (already_found == 0) {
     for (int i = 0; i < NUM_INSTR_DESTINATIONS; i++) {
-      if (curr_instr.destination_memory[i] == 0) {
-        curr_instr.destination_memory[i] = (unsigned long long int)addr;
+      if (curr_ins.destination_memory[i] == 0) {
+        curr_ins.destination_memory[i] = (unsigned long long int)addr;
         break;
       }
     }
@@ -343,14 +351,13 @@ Instruction(INS ins, VOID* v) {
   UINT32 category = INS_Category(ins);
   std::string category_string = CATEGORY_StringShort(category);
 
-  // Get globally-unique routine ID
-  curr_instr.routine_id = RTN_Id(INS_Rtn(ins));
-
   INS_InsertCall(
       ins,
       IPOINT_BEFORE,
       (AFUNPTR)BeginInstruction,
       IARG_INST_PTR,
+      IARG_UINT32,
+      RTN_Id(INS_Rtn(ins)),
       IARG_UINT32,
       opcode,
       IARG_UINT32,
@@ -448,10 +455,64 @@ Instruction(INS ins, VOID* v) {
   INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)EndInstruction, IARG_END);
 }
 
+VOID
+WriteBasicBlock(ADDRINT address, UINT32 num_ins) {
+  if (instrCount > KnobSkipInstructions.Value() &&
+      instrCount <=
+          (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
+    basicblock bbl;
+    bbl.address = address;
+    bbl.num_ins = num_ins;
+    io->write_bbl(bbl);
+  }
+}
+
+// Is called for every trace and instruments reads and writes
+VOID
+Trace(TRACE trace, VOID* v) {
+  // Visit every basic block  in the trace
+  for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl)) {
+    // Insert a call to docount before every bbl, passing the number of
+    // instructions
+    BBL_InsertCall(
+        bbl,
+        IPOINT_BEFORE,
+        (AFUNPTR)WriteBasicBlock,
+        IARG_ADDRINT,
+        BBL_Address(bbl),
+        IARG_UINT32,
+        BBL_NumIns(bbl),
+        IARG_END);
+  }
+}
+
+VOID
+WriteRoutine(UINT32 id, UINT32 num_ins) {
+  if (instrCount > KnobSkipInstructions.Value() &&
+      instrCount <=
+          (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
+    routine rtn;
+    rtn.id = 0;
+    rtn.num_ins = 0;
+    io->write_rtn(rtn);
+  }
+}
+
 // Is called for every routine and instruments reads and writes
 VOID
 Routine(RTN rtn, VOID* v) {
   // std::cout << "Function: " << RTN_Name(rtn) << std::endl;
+  RTN_Open(rtn);
+  RTN_InsertCall(
+      rtn,
+      IPOINT_BEFORE,
+      (AFUNPTR)WriteRoutine,
+      IARG_UINT32,
+      RTN_Id(rtn),
+      IARG_UINT32,
+      RTN_NumIns(rtn),
+      IARG_END);
+  RTN_Close(rtn);
 }
 
 // Is called for every image and instruments reads and writes
@@ -502,20 +563,18 @@ main(int argc, char* argv[]) {
   ss << KnobOutputDirectory.Value().c_str() << "/"
      << KnobProgressPath.Value().c_str();
   progress_file.open(ss.str().c_str());
-  ss.str(std::string());
-  ss << "gzip -9c > " << KnobOutputDirectory.Value().c_str() << "/"
-     << KnobTracePath.Value().c_str();
 
-  trace_file = popen(ss.str().c_str(), "w");
   ss.str(std::string());
   ss << KnobOutputDirectory.Value().c_str() << "/"
      << KnobMetaPath.Value().c_str();
   meta_file.open(ss.str().c_str());
 
-  if (!trace_file) {
-    std::cout << "Couldn't open output trace file. Exiting." << std::endl;
-    exit(1);
-  }
+  io = new TraceIO(
+      false,
+      KnobOutputDirectory.Value().c_str(),
+      KnobINSPath.Value().c_str(),
+      KnobBBLPath.Value().c_str(),
+      KnobRTNPath.Value().c_str());
 
   PIN_InitSymbols();
 
@@ -525,6 +584,9 @@ main(int argc, char* argv[]) {
   // Register function to be called to instrument instructions
   INS_AddInstrumentFunction(Instruction, 0);
 
+  // Register function to be called to instrument bassic blocks
+  TRACE_AddInstrumentFunction(Trace, 0);
+
   // Register function to be called to instrument routines
   RTN_AddInstrumentFunction(Routine, 0);
 
@@ -533,9 +595,9 @@ main(int argc, char* argv[]) {
 
   std::cerr << "===============================================" << std::endl;
   std::cerr
-      << "This application is instrumented by the PhaseSim Trace Generator"
+      << "This application is instrumented by the libphase Trace Generator"
       << std::endl;
-  std::cerr << "Trace saved in " << KnobTracePath.Value() << std::endl;
+  std::cerr << "Trace saved in " << KnobINSPath.Value() << std::endl;
   std::cerr << "===============================================" << std::endl;
 
   // Start the program, never returns

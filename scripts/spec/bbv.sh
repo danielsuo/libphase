@@ -27,7 +27,6 @@ for i in `find $DIR/cpu2017/benchspec -maxdepth 3 -type d | grep run`; do
 
   # Remove all comments
   sed -i '/^#/d' $raw
-  
 
   counter=0
   while read; do
