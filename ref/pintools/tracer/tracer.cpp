@@ -456,13 +456,21 @@ Instruction(INS ins, VOID* v) {
 }
 
 VOID
-WriteBasicBlock(ADDRINT address, UINT32 num_ins) {
+WriteBasicBlock(
+    ADDRINT address,
+    UINT32 num_ins,
+    BOOL valid,
+    BOOL original,
+    BOOL fallthrough) {
   if (instrCount > KnobSkipInstructions.Value() &&
       instrCount <=
           (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
     basicblock bbl;
     bbl.address = address;
     bbl.num_ins = num_ins;
+    bbl.valid = valid;
+    bbl.original = original;
+    bbl.fallthrough = fallthrough;
     io->write_bbl(bbl);
   }
 }
@@ -482,18 +490,25 @@ Trace(TRACE trace, VOID* v) {
         BBL_Address(bbl),
         IARG_UINT32,
         BBL_NumIns(bbl),
+        IARG_BOOL,
+        BBL_Valid(bbl),
+        IARG_BOOL,
+        BBL_Original(bbl),
+        IARG_BOOL,
+        BBL_HasFallThrough(bbl),
         IARG_END);
   }
 }
 
 VOID
-WriteRoutine(UINT32 id, UINT32 num_ins) {
+WriteRoutine(ADDRINT address, UINT32 id, UINT32 num_ins) {
   if (instrCount > KnobSkipInstructions.Value() &&
       instrCount <=
           (KnobTraceInstructions.Value() + KnobSkipInstructions.Value())) {
     routine rtn;
-    rtn.id = 0;
-    rtn.num_ins = 0;
+    rtn.address = address;
+    rtn.id = id;
+    rtn.num_ins = num_ins;
     io->write_rtn(rtn);
   }
 }
@@ -507,6 +522,8 @@ Routine(RTN rtn, VOID* v) {
       rtn,
       IPOINT_BEFORE,
       (AFUNPTR)WriteRoutine,
+      IARG_ADDRINT,
+      RTN_Address(rtn),
       IARG_UINT32,
       RTN_Id(rtn),
       IARG_UINT32,

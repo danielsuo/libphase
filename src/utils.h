@@ -1,9 +1,6 @@
 #pragma once
 
-#include <fstream>
 #include <iostream>
-#include <map>
-#include <string>
 #include "stdint.h"
 
 namespace libphase {
@@ -134,20 +131,11 @@ class instruction {
   // branch info
   uint8_t branch_info;
 
-<<<<<<< HEAD
   uint8_t destination_registers[CONSTANTS::num_instr_dsts]; // output registers
   uint8_t source_registers[CONSTANTS::num_instr_srcs]; // input registers
 
   uint64_t destination_memory[CONSTANTS::num_instr_dsts]; // output memory
   uint64_t source_memory[CONSTANTS::num_instr_srcs]; // input memory
-=======
-  // TODO: these shouldn't be hard-coded
-  uint8_t destination_registers[2]; // output registers
-  uint8_t source_registers[4]; // input registers
-
-  uint64_t destination_memory[2]; // output memory
-  uint64_t source_memory[4]; // input memory
->>>>>>> dc4bccef49612f1551019f918452c9f5bd481f7d
 
   instruction() {
     ip = 0;
@@ -171,13 +159,17 @@ class instruction {
 class basicblock {
  public:
   // TODO: poorly packed data
-  uint64_t address;
-  uint32_t num_ins;
+  uint64_t address = 0;
+  uint32_t num_ins = 0;
+  bool valid = false;
+  bool original = false;
+  bool fallthrough = false;
 };
 
 class routine {
  public:
-  uint32_t id;
-  uint32_t num_ins;
+  uint64_t address = 0;
+  uint32_t id = 0;
+  uint32_t num_ins = 0;
 };
 } // namespace libphase

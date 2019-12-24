@@ -28,7 +28,11 @@ include_directories (
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CLIPP_INCLUDE_DIRS}
   ${YAML_CPP_INCLUDE_DIRS}
+  ${PIN_XED_INCLUDE_DIRS}
+  ${PIN_INCLUDE_DIRS}
   )
+
+message (${PIN_INCLUDE_DIRS})
 
 # Link directories
 link_directories (
