@@ -117,7 +117,8 @@ class TraceIO {
     }
 
     if (curr_ins.ip == next_bbl.address) {
-      if (num_ins_ - num_ins_curr_bbl_ != curr_bbl.num_ins) {
+      if (abs(num_ins_ - num_ins_curr_bbl_ - curr_bbl.num_ins) > 1 and
+          !curr_bbl.fallthrough) {
         std::cout << "ERROR: invalid BBL read" << std::endl;
         std::cout << "New bbl: " << next_bbl.address << " "
                   << num_ins_ - num_ins_curr_bbl_ << " " << curr_bbl.num_ins
@@ -138,7 +139,7 @@ class TraceIO {
                   << num_ins_ - num_ins_curr_rtn_ << " " << curr_rtn.num_ins
                   << " " << curr_ins.opcode << " " << next_rtn.id << " "
                   << curr_ins.routine_id << std::endl;
-        exit(1);
+        //exit(1);
       }
       read_rtn();
     }

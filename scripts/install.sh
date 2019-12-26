@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Optional: Valgrind, Perf
-sudo apt-get install valgrind linux-tools-common linux-tools-generic linux-tools-`uname -r`
+sudo apt-get install -y valgrind linux-tools-common linux-tools-generic linux-tools-`uname -r` parallel
 
 # Optional: Allow perf without sudo
 sudo sh -c 'echo 1 >/proc/sys/kernel/perf_event_paranoid'
