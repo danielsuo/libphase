@@ -44,9 +44,9 @@ class TraceIO {
   TraceIO(
       bool isReader = true,
       std::string directory = "tmp",
-      std::string ins_filename = "libphase.ins.gz",
-      std::string bbl_filename = "libphase.bbl.gz",
-      std::string rtn_filename = "libphase.rtn.gz")
+      std::string ins_filename = "libphase.ins.xz",
+      std::string bbl_filename = "libphase.bbl.xz",
+      std::string rtn_filename = "libphase.rtn.xz")
       : isReader_(isReader),
         ins_file_open_(false),
         bbl_file_open_(false),
