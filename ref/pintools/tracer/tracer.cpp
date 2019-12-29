@@ -62,21 +62,21 @@ KNOB<string> KnobINSPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "f",
-    "libphase.ins.xz",
+    "libphase.ins",
     "specify file name for libphase instruction stream");
 
 KNOB<string> KnobBBLPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "b",
-    "libphase.bbl.xz",
+    "libphase.bbl",
     "specify file name for libphase basic block stream");
 
 KNOB<string> KnobRTNPath(
     KNOB_MODE_WRITEONCE,
     "pintool",
     "r",
-    "libphase.rtn.xz",
+    "libphase.rtn",
     "specify file name for libphase routine stream");
 
 KNOB<string> KnobOutputDirectory(
@@ -95,6 +95,13 @@ KNOB<string> KnobMetaPath(
     "m",
     "libphase.meta",
     "specify file name to output meta data");
+
+KNOB<string> KnobFinalizePath(
+    KNOB_MODE_WRITEONCE,
+    "pintool",
+    "l",
+    "libphase.finalized",
+    "Written once trace is complete");
 
 KNOB<UINT64> KnobSkipInstructions(
     KNOB_MODE_WRITEONCE,
@@ -147,7 +154,6 @@ finalize() {
 
 void
 BeginInstruction(VOID* ip, UINT32 routine_id, UINT32 opcode, UINT32 category) {
-  // cerr << "1 Begin: " << (unsigned long long int)ip << endl;
   if (instrCount % 1000000 == 0) {
     progress_file << program_name << ": " << instrCount << " instructions"
                   << std::endl;
@@ -284,12 +290,6 @@ RegWrite(REG i, UINT32 index) {
       }
     }
   }
-  /*
-     if(index==0)
-     {
-     curr_ins.destination_register = (unsigned long long int)r;
-     }
-     */
 }
 
 void
@@ -571,8 +571,6 @@ main(int argc, char* argv[]) {
   }
 
   std::stringstream ss;
-  // ss << "mkdir -p " << KnobOutputDirectory.Value().c_str();
-  // std::system(ss.str().c_str());
 
   program_name = std::string(argv[0]);
 
@@ -591,7 +589,8 @@ main(int argc, char* argv[]) {
       KnobOutputDirectory.Value().c_str(),
       KnobINSPath.Value().c_str(),
       KnobBBLPath.Value().c_str(),
-      KnobRTNPath.Value().c_str());
+      KnobRTNPath.Value().c_str(),
+      true);
 
   PIN_InitSymbols();
 

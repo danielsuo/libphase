@@ -44,27 +44,43 @@ class TraceIO {
   TraceIO(
       bool isReader = true,
       std::string directory = "tmp",
-      std::string ins_filename = "libphase.ins.xz",
-      std::string bbl_filename = "libphase.bbl.xz",
-      std::string rtn_filename = "libphase.rtn.xz")
+      std::string ins_filename = "libphase.ins",
+      std::string bbl_filename = "libphase.bbl",
+      std::string rtn_filename = "libphase.rtn",
+      bool compress = false)
       : isReader_(isReader),
         ins_file_open_(false),
         bbl_file_open_(false),
         rtn_file_open_(false) {
     std::cout << "Initializing " << traceIOTypeString_() << std::endl;
 
-    std::string xz_command = std::string(isReader_ ? "xz -dc " : "xz -9 -c > ");
     const char* read_or_write = isReader_ ? "r" : "w";
 
-    ins_file_ = popen(
-        std::string(xz_command + directory + "/" + ins_filename).c_str(),
-        read_or_write);
-    bbl_file_ = popen(
-        std::string(xz_command + directory + "/" + bbl_filename).c_str(),
-        read_or_write);
-    rtn_file_ = popen(
-        std::string(xz_command + directory + "/" + rtn_filename).c_str(),
-        read_or_write);
+    if (compress) {
+      std::string compress_command =
+          std::string(isReader_ ? "gunzip -c " : "gzip > ");
+      ins_file_ = popen(
+          std::string(compress_command + directory + "/" + ins_filename + ".gz")
+              .c_str(),
+          read_or_write);
+      bbl_file_ = popen(
+          std::string(compress_command + directory + "/" + bbl_filename + ".gz")
+              .c_str(),
+          read_or_write);
+      rtn_file_ = popen(
+          std::string(compress_command + directory + "/" + rtn_filename + ".gz")
+              .c_str(),
+          read_or_write);
+    }
+
+    else {
+      ins_file_ = fopen(
+          std::string(directory + "/" + ins_filename).c_str(), read_or_write);
+      bbl_file_ = fopen(
+          std::string(directory + "/" + bbl_filename).c_str(), read_or_write);
+      rtn_file_ = fopen(
+          std::string(directory + "/" + rtn_filename).c_str(), read_or_write);
+    }
 
     if (!ins_file_) {
       std::cout << "Couldn't open ins file. Exiting." << std::endl;
@@ -117,30 +133,29 @@ class TraceIO {
     }
 
     if (curr_ins.ip == next_bbl.address) {
-      if (abs(num_ins_ - num_ins_curr_bbl_ - curr_bbl.num_ins) > 1 and
-          !curr_bbl.fallthrough) {
-        std::cout << "ERROR: invalid BBL read" << std::endl;
-        std::cout << "New bbl: " << next_bbl.address << " "
-                  << num_ins_ - num_ins_curr_bbl_ << " " << curr_bbl.num_ins
-                  << std::endl;
-        std::cout << "Valid: " << curr_bbl.valid << std::endl;
-        std::cout << "Original: " << curr_bbl.original << std::endl;
-        std::cout << "Fallthrough: " << curr_bbl.fallthrough << std::endl;
-        std::cout << std::endl;
-        // exit(1);
-      }
+      // NOTE: fix abs for uint64_t
+      // if (abs(num_ins_ - num_ins_curr_bbl_ - curr_bbl.num_ins) > 1 and
+      //! curr_bbl.fallthrough) {
+      // std::cout << "ERROR: invalid BBL read" << std::endl;
+      // std::cout << "New bbl: " << next_bbl.address << " "
+      //<< num_ins_ - num_ins_curr_bbl_ << " " << curr_bbl.num_ins
+      //<< std::endl;
+      // std::cout << "Valid: " << curr_bbl.valid << std::endl;
+      // std::cout << "Original: " << curr_bbl.original << std::endl;
+      // std::cout << "Fallthrough: " << curr_bbl.fallthrough << std::endl;
+      // std::cout << std::endl;
+      //}
       read_bbl();
     }
 
     if (curr_ins.ip == next_rtn.address) {
-      if (next_rtn.id != curr_ins.routine_id) {
-        std::cout << "ERROR: invalid RTN read" << std::endl;
-        std::cout << "New rtn: " << next_rtn.address << " "
-                  << num_ins_ - num_ins_curr_rtn_ << " " << curr_rtn.num_ins
-                  << " " << curr_ins.opcode << " " << next_rtn.id << " "
-                  << curr_ins.routine_id << std::endl;
-        //exit(1);
-      }
+      // if (next_rtn.id != curr_ins.routine_id) {
+      // std::cout << "ERROR: invalid RTN read" << std::endl;
+      // std::cout << "New rtn: " << next_rtn.address << " "
+      //<< num_ins_ - num_ins_curr_rtn_ << " " << curr_rtn.num_ins
+      //<< " " << curr_ins.opcode << " " << next_rtn.id << " "
+      //<< curr_ins.routine_id << std::endl;
+      //}
       read_rtn();
     }
 
