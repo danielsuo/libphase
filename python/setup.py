@@ -13,6 +13,7 @@ setup(
         "tqdm",
         "pandas",
         "matplotlib",
+        "seaborn",
         "jupyter",
         "ipynb",
         "pixiedust"
