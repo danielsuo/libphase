@@ -22,6 +22,7 @@ file (GLOB TOOLS_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/ref/tools/*.cc)
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/deps/yaml-cpp)
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/deps/clipp)
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/deps/pin)
+add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/deps/simpoint)
 
 # Include directories
 include_directories (
