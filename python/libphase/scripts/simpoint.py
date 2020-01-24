@@ -12,8 +12,8 @@ SIMPOINT_HOME = os.path.join(
     "deps/simpoint/simpoint-git-prefix/src/simpoint-git/")
 
 
-def simpoint(bbv_file, k, max_k, variable_length, output_dir, verbose, quiet,
-             args):
+def simpoint(bbv_file, k, max_k, proj_matrix, variable_length, output_dir,
+             save_proj_matrix, verbose, quiet, args):
 
     print(locals())
 
@@ -35,6 +35,16 @@ def simpoint(bbv_file, k, max_k, variable_length, output_dir, verbose, quiet,
         os.path.join(output_dir, "out.labels"), "-saveVectorsTxtFmt",
         os.path.join(output_dir, "out.vectors")
     ]
+
+    if proj_matrix is not None:
+        cmd.extend(["-loadProjMatrixTxtFmt", proj_matrix])
+
+    if save_proj_matrix:
+        cmd.extend([
+            "-saveProjMatrixTxtFmt",
+            os.path.join(output_dir, "out.proj_matrix")
+        ])
+
     if k is not None:
         cmd.extend(["-k", k])
     else:
@@ -79,6 +89,11 @@ def simpoint(bbv_file, k, max_k, variable_length, output_dir, verbose, quiet,
               default=30,
               type=int,
               help="Compute up to max k using binary search")
+@click.option("-p",
+              "--load-projection-matrix",
+              default=None,
+              type=click.Path(exists=True),
+              help="Use an existing projection matrix")
 @click.option("--variable-length",
               type=bool,
               is_flag=True,
@@ -88,6 +103,9 @@ def simpoint(bbv_file, k, max_k, variable_length, output_dir, verbose, quiet,
               default="out",
               type=click.Path(),
               help="Output directory")
+@click.option("--save-projection-matrix",
+              is_flag=True,
+              help="Enables verbose mode")
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 @click.option("-q", "--quiet", is_flag=True, help="Suppress output")
 @click.argument("args", nargs=-1, type=click.UNPROCESSED)
